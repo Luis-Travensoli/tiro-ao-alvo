@@ -3,28 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jogo de Tiro ao Alvo Elaborado</title>
+    <title>Urubu Runner: Jogo de Obstáculos</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <header>
-        <h1>💥 Jogo de Tiro ao Alvo 💥</h1>
+        <h1>Urubu Runner 🦅</h1>
     </header>
 
     <main>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
 
         <div id="info-panel">
-            <p>Pontuação: <span id="score">0</span></p>
-            <p>Tempo Restante: <span id="timer">60</span>s</p>
-            <p>Vidas: <span id="lives">3</span></p>
+            <h2>Estatísticas</h2>
+            <p>Distância: <span id="distance">0</span> m</p>
+            <p>Melhor Distância: <span id="highScore">0</span> m</p>
+            <div id="message-area">
+                Clique em **INICIAR** ou pressione **ESPAÇO** para voar!
+            </div>
             <button id="startButton">INICIAR JOGO</button>
         </div>
     </main>
 
     <footer>
-        <p>&copy; 2024 Jogo Elaborado. Desenvolvido com HTML, CSS e JS.</p>
+        <p>&copy; 2024 Urubu Runner. Um jogo de passar em obstáculos.</p>
     </footer>
 
     <script src="script.js"></script>

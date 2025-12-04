@@ -2,108 +2,198 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const startButton = document.getElementById('startButton');
-const scoreDisplay = document.getElementById('score');
-const timerDisplay = document.getElementById('timer');
-const livesDisplay = document.getElementById('lives');
+const distanceDisplay = document.getElementById('distance');
+const highScoreDisplay = document.getElementById('highScore');
+const messageArea = document.getElementById('message-area');
 
-// Variáveis do Jogo
-let score = 0;
-let timeRemaining = 60;
-let lives = 3;
+// --- Variáveis de Jogo ---
 let isPlaying = false;
+let gameSpeed = 3;
+let score = 0;
+let highScore = 0;
+let gravity = 0.5;
+let lift = -8; // Força do 'pulo' ou batida de asa
 let gameLoop;
-let target = {}; // Objeto que conterá as propriedades do alvo (x, y, raio, velocidade)
 
-// --- Funções de Lógica ---
+// --- Objeto Urubu (Personagem) ---
+const urubu = {
+    x: 50,
+    y: canvas.height / 2,
+    width: 40,
+    height: 30,
+    velocity: 0,
+    draw() {
+        // Desenha o Urubu (simples, como um triângulo ou retângulo estilizado)
+        ctx.fillStyle = 'black';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        
+        // Adiciona um 'olho' ou detalhe para parecer mais elaborado
+        ctx.fillStyle = '#fca311';
+        ctx.beginPath();
+        ctx.arc(this.x + this.width, this.y + 5, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.closePath();
+    },
+    update() {
+        // Aplica a gravidade
+        this.velocity += gravity;
+        this.y += this.velocity;
+
+        // Limita o Urubu à parte superior e inferior do canvas
+        if (this.y + this.height > canvas.height) {
+            this.y = canvas.height - this.height;
+            this.velocity = 0;
+            // FIM DE JOGO: Tocou no chão
+            if (isPlaying) {
+                 gameOver();
+            }
+        }
+        if (this.y < 0) {
+            this.y = 0;
+            this.velocity = 0;
+        }
+    },
+    flap() {
+        this.velocity = lift; // Aplica a força de 'pulo' para cima
+    }
+};
+
+// --- Obstáculos (Barreiras) ---
+let obstacles = [];
+const obstacleWidth = 50;
+const gapHeight = 150; // Tamanho da abertura para o urubu passar
+let obstacleSpawnInterval = 100; // A cada 100 frames um novo obstáculo
+
+function createObstacle() {
+    const minHeight = 50;
+    const maxHeight = canvas.height - gapHeight - minHeight;
+    const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+
+    obstacles.push({
+        x: canvas.width,
+        topH: topHeight,
+        bottomH: canvas.height - topHeight - gapHeight,
+        passed: false // Se o urubu já passou por este obstáculo
+    });
+}
+
+function updateObstacles() {
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.x -= gameSpeed;
+
+        // Desenha o obstáculo
+        ctx.fillStyle = '#483c32'; // Cor de um tronco ou montanha
+        
+        // Parte superior do obstáculo
+        ctx.fillRect(obs.x, 0, obstacleWidth, obs.topH);
+        
+        // Parte inferior do obstáculo
+        ctx.fillRect(obs.x, obs.topH + gapHeight, obstacleWidth, obs.bottomH);
+
+        // Verifica se o Urubu marcou ponto (passou pelo obstáculo)
+        if (obs.x + obstacleWidth < urubu.x && !obs.passed) {
+            score++;
+            obs.passed = true;
+            distanceDisplay.textContent = score;
+        }
+
+        // Remove obstáculos que saíram da tela
+        if (obs.x + obstacleWidth < 0) {
+            obstacles.splice(i, 1);
+        }
+
+        // --- Detecção de Colisão ---
+        if (
+            urubu.x < obs.x + obstacleWidth &&
+            urubu.x + urubu.width > obs.x &&
+            (urubu.y < obs.topH || urubu.y + urubu.height > obs.topH + gapHeight)
+        ) {
+            // COLISÃO! FIM DE JOGO
+            gameOver();
+        }
+    }
+
+    // Lógica para gerar novos obstáculos
+    if (score % obstacleSpawnInterval === 0 && score > 0) {
+        createObstacle();
+    }
+}
+
+
+// --- Funções de Controle ---
 
 function startGame() {
     if (isPlaying) return;
 
     isPlaying = true;
     score = 0;
-    timeRemaining = 60;
-    lives = 3;
-
-    // Inicializa o alvo
-    initializeTarget();
-
-    // Atualiza o painel de informações
-    updateInfoPanel();
-
-    // Inicia o loop do jogo e o timer
+    urubu.y = canvas.height / 2;
+    urubu.velocity = 0;
+    obstacles = []; // Limpa os obstáculos
+    distanceDisplay.textContent = score;
+    messageArea.textContent = 'Voando...';
+    
+    // Inicia o loop principal do jogo
     gameLoop = requestAnimationFrame(gameUpdate);
-    startTimer();
 }
 
-function initializeTarget() {
-    // Implemente a lógica para posicionar o alvo aleatoriamente
-    // Exemplo:
-    target.x = Math.random() * (canvas.width - 50) + 25;
-    target.y = Math.random() * (canvas.height - 50) + 25;
-    target.radius = 20;
-    target.vx = (Math.random() - 0.5) * 2; // Velocidade aleatória em X
-    target.vy = (Math.random() - 0.5) * 2; // Velocidade aleatória em Y
-}
+function gameOver() {
+    isPlaying = false;
+    cancelAnimationFrame(gameLoop);
 
-function drawTarget() {
-    // Desenha o alvo no canvas
-    // 
-
-[Image of shooting target on a canvas]
-
-    ctx.beginPath();
-    ctx.arc(target.x, target.y, target.radius, 0, Math.PI * 2);
-    ctx.fillStyle = 'red';
-    ctx.fill();
-    ctx.closePath();
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('urubuHighScore', highScore);
+        highScoreDisplay.textContent = highScore;
+        messageArea.textContent = `NOVO RECORDE: ${score}m! 🏆`;
+    } else {
+        messageArea.textContent = `Fim de Jogo! Distância: ${score}m.`;
+    }
 }
 
 function gameUpdate() {
+    if (!isPlaying) return;
+
     // 1. Limpa o canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Atualiza a posição do alvo
-    target.x += target.vx;
-    target.y += target.vy;
+    // 2. Atualiza e desenha o Urubu
+    urubu.update();
+    urubu.draw();
 
-    // 3. Verifica colisão com as bordas (ricochete)
-    if (target.x + target.radius > canvas.width || target.x - target.radius < 0) {
-        target.vx = -target.vx;
-    }
-    if (target.y + target.radius > canvas.height || target.y - target.radius < 0) {
-        target.vy = -target.vy;
-    }
+    // 3. Cria e movimenta os obstáculos
+    updateObstacles();
 
-    // 4. Desenha o alvo
-    drawTarget();
-
-    // 5. Continua o loop do jogo se estiver jogando
-    if (isPlaying) {
-        requestAnimationFrame(gameUpdate);
-    }
+    // 4. Continua o loop do jogo
+    requestAnimationFrame(gameUpdate);
 }
 
-// ... Outras funções (handleShoot, startTimer, updateInfoPanel, gameOver) ...
 
-// Event Listeners
+// --- Eventos ---
+
+// Carregar High Score
+window.onload = () => {
+    highScore = localStorage.getItem('urubuHighScore') || 0;
+    highScoreDisplay.textContent = highScore;
+    createObstacle(); // Cria o primeiro obstáculo para começar
+};
+
+// Botão Iniciar
 startButton.addEventListener('click', startGame);
 
-// Exemplo de como detectar o tiro (clique)
-canvas.addEventListener('click', (event) => {
-    if (!isPlaying) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
-
-    // Cálculo da distância entre o clique e o centro do alvo
-    const distance = Math.sqrt((clickX - target.x) ** 2 + (clickY - target.y) ** 2);
-
-    if (distance < target.radius) {
-        // ACERTOU!
-        score += 10;
-        updateInfoPanel();
-        initializeTarget(); // Reposiciona o alvo
+// 'Pulo' do Urubu ao clicar ou pressionar ESPAÇO
+const handleFlap = () => {
+    if (!isPlaying) {
+        startGame();
     }
-    // Você pode subtrair uma vida se errar o alvo, para um jogo mais difícil.
+    urubu.flap();
+};
+
+canvas.addEventListener('mousedown', handleFlap);
+document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') {
+        event.preventDefault(); // Impede a rolagem da tela ao pressionar espaço
+        handleFlap();
+    }
 });
